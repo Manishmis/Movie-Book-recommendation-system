@@ -1,0 +1,100 @@
+# scripts/content_based.py
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Load data
+df = pd.read_csv("data/movies.csv")
+
+# Combine features
+df['features'] = df['genres'] + " " + df['keywords']
+
+# Vectorize features
+tfidf = TfidfVectorizer(stop_words='english')
+tfidf_matrix = tfidf.fit_transform(df['features'])
+
+# Compute similarity
+cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+
+# Recommendation function
+def recommend_movies(title, cosine_sim=cosine_sim):
+    idx = df[df['title'] == title].index[0]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    sim_scores = sim_scores[1:6]  # Top 5 similar movies
+    movie_indices = [i[0] for i in sim_scores]
+    return df['title'].iloc[movie_indices]
+
+# Example
+print(recommend_movies("Inception"))
+
+
+
+
+1. The Matrix  
+2. Interstellar  
+3. Shutter Island  
+4. Tenet  
+5. Blade Runner 2049  
+
+
+# scripts/collaborative_filtering.py
+import pandas as pd
+from sklearn.neighbors import NearestNeighbors
+
+# Load data
+ratings = pd.read_csv("data/ratings.csv")
+movies = pd.read_csv("data/movies.csv")
+
+# Create pivot table (user-item matrix)
+user_item_matrix = ratings.pivot_table(index='userId', columns='movieId', values='rating').fillna(0)
+
+# KNN model
+model_knn = NearestNeighbors(metric='cosine', algorithm='brute')
+model_knn.fit(user_item_matrix)
+
+# Recommendation function
+def recommend_for_user(user_id, n_recommendations=5):
+    distances, indices = model_knn.kneighbors(
+        user_item_matrix.iloc[user_id-1].values.reshape(1, -1), 
+        n_neighbors=n_recommendations+1
+    )
+    similar_users = indices.flatten()[1:]
+    recommended_movies = ratings[ratings['userId'].isin(similar_users)]\
+        .groupby('movieId')['rating'].mean()\
+        .sort_values(ascending=False)\
+        .head(n_recommendations)
+    return movies[movies['movieId'].isin(recommended_movies.index)]['title']
+
+# Example
+print(recommend_for_user(1))  # Recommendations for User 1
+
+
+
+1. The Shawshank Redemption  
+2. The Dark Knight  
+3. Pulp Fiction  
+4. Fight Club  
+5. Inception  
+
+
+
+Install dependencies:
+
+bash
+pip install pandas scikit-learn numpy
+Run the recommendation script:
+
+bash
+python scripts/content_based.py  # For content-based
+python scripts/collaborative_filtering.py  # For collaborative
+
+
+
+
+
+
+
+
+
+
